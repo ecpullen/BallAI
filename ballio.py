@@ -2,10 +2,9 @@ import datetime
 import random
 import tkinter as tk
 import numpy as np
-from neuralNetwork import Node, Neural_Network
+from neuralnet import Node, Neural_Network
 import time
 from copy import deepcopy
-
 
 class Ballio:
 
@@ -26,13 +25,33 @@ class Ballio:
             Ball(600 * random.random(), 300 + 300 * random.random(), 10 * random.random() - 5, 0, 20, 'blue',
                  self.canvas))'''
 
-        self.posX = [0, 20,2,2,2]
-
-        self.paddles = []
-        for x in self.posX:
-            self.paddles.append(self.canvas.create_rectangle(x-75,500,x+75,505))
+        self.posX = [0]
 
         
+        #nn = Neural_Network([5,3,2,2])
+        #print(nn)
+        '''
+        nn.network[1][0].weights = [1,-1,0,0,0]
+        nn.network[1][1].weights = [0,0,1,-1,0]
+        nn.network[1][2].weights = [0,0,0,-1,1]
+        nn.network[1][0].bias = 0
+        nn.network[1][1].bias = 0
+        nn.network[1][2].bias = 0
+
+        nn.network[2][0].weights = [1,1,0]
+        nn.network[2][1].weights = [-1,0,-1]
+        nn.network[2][0].bias = -2
+        nn.network[2][1].bias = 0
+
+        nn.network[3][0].weights = [1,1]
+        nn.network[3][1].weights = [-1,-1]
+        nn.network[3][0].bias = -1
+        nn.network[3][1].bias = 0
+        
+        self.init()
+        self.game([nn])
+        '''
+
         '''self.canvas.bind('<Motion>', self.update_mouse)
         #create networks
         scores = [0 for _ in self.posX]
@@ -45,7 +64,7 @@ class Ballio:
             self.move_paddles()
             print(scores)'''
 
-        self.inputs = [Node(0) for _ in range(5)]
+        '''self.inputs = [Node(0) for _ in range(5)]
         self.outputs = [Node(0) for _ in range(2)]
         self.posX = []
         for _ in range(5):
@@ -57,7 +76,7 @@ class Ballio:
         print(self.game(nns))
 
         for nn in nns:
-            nn.fire_test()
+            pass'''
         '''while True:
             print("top")
             time.sleep(1)
@@ -75,6 +94,25 @@ class Ballio:
             Breed/repopulate nns
         '''
             #nns = next_gen
+        nns = [Neural_Network([2,2]) for _ in range(20)]
+
+
+        nn = Neural_Network([2,2])
+        #print(nn)
+        
+        nn.network[1][0].weights = [-1,1]
+        nn.network[1][1].weights = [1,1]
+        nn.network[1][0].bias = 0
+        nn.network[1][1].bias = 0
+
+        self.posX = [300 for _ in nns]
+        #print("len",len(self.posX))
+        nns[0] = nn.get_copy()
+        self.paddles = []
+        for x in self.posX:
+            self.paddles.append(self.canvas.create_rectangle(x-75,500,x+75,505, fill = 'grey'))
+        self.init()
+        self.game(nns)
 
     def init(self):
         for ball in self.balls:
@@ -83,30 +121,36 @@ class Ballio:
         self.balls.append(
             Ball(600 * random.random(), 300 + 300 * random.random(), 10 * random.random() - 5, 0, 50, 'red',
                  self.canvas))
-        self.balls.append(
+        '''self.balls.append(
             Ball(600 * random.random(), 300 + 300 * random.random(), 10 * random.random() - 5, 0, 20, 'blue',
-                 self.canvas))
+                 self.canvas))'''
         self.move_paddles()
 
     def game(self,nns=[]):
         i = 0
-        [bx,by] = self.balls[0].get()
-        [rx,ry] = self.balls[1].get()
-        for nn in nns:
-            nn.evaluate([bx,by,rx,ry,self.posX[i]])
-            i+=1
-        scores = [0 for _ in self.posX]
+        scores = [0 for _ in nns]
         while max(scores) >= 0:
             self.root.update_idletasks()
             self.root.update()
-            #update all nns
+            self.update_nn(nns)
             for b in self.balls:
-                scores = b.update(self.posX,scores)
+                b.update(self.posX,nns)
             self.move_paddles()
             #print(scores)
         return scores;
 
-
+    def update_nn(self, nns):
+        [bx,by] = self.balls[0].get()
+        #[rx,ry] = self.balls[1].get()
+        #print("len",len(self.posX))
+        for i in range(len(nns)):
+            #print(self.posX[i])
+            outs = nns[i].evaluate([bx,self.posX[i]])
+            # outs = nns[i].evaluate([by,ry,bx,self.posX[i],rx])
+            if outs[0] == 1:
+                self.move(i,-10)
+            if outs[1] == 1:
+                self.move(i,10)
 
     def update_mouse(self, event):
         self.posX[0] = max(0,min(600,event.x))
@@ -114,13 +158,13 @@ class Ballio:
     def move_paddles(self):
         #print(len(self.paddles))
         for i in range(len(self.paddles)):
-            self.canvas.coords(self.paddles[i],self.posX[i]-75,500,self.posX[i]+75,505)
+            self.canvas.coords(self.paddles[i],self.posX[i]-75,500+i/5,self.posX[i]+75,505+2*i/5)
         return
 
     def move(self, idx, delX):
         print("moving: ",idx, " by: ", delX, " to: ",self.posX[idx] + delX)
-        self.posX[idx] += delX
-        self.move_paddles()
+        self.posX[idx] = min(600,max(0,self.posX[idx]+delX))
+        #self.move_paddles()
 
 class Ball:
 
@@ -134,12 +178,10 @@ class Ball:
         self.circ = self.canvas.create_oval(self.x-self.rad/2, 600 - (self.y-self.rad/2), self.x + self.rad/2, 600-(self.y + self.rad/2), fill = col)
         self.last_time = datetime.datetime.now()
 
-    def update(self, posX, scores):
+    def update(self, posX, nns):
         #print(datetime.datetime.now() - self.last_time, " ", datetime.timedelta(milliseconds=10), "", (datetime.datetime.now() - self.last_time) > datetime.timedelta(milliseconds=10))
         if(datetime.datetime.now() - self.last_time) < datetime.timedelta(milliseconds=10):
-            #print("skipping")
-            return scores
-        #print("updating: ", scores)
+            return
         self.last_time = datetime.datetime.now()
         self.x += self.xvel
         self.y += self.yvel
@@ -153,24 +195,20 @@ class Ball:
             self.y = 600 - self.rad/2
 
         self.canvas.coords(self.circ, self.x-self.rad/2, 600 - (self.y-self.rad/2), self.x + self.rad/2, 600-(self.y + self.rad/2))
-
+        #print(self.x, ", ",self.y)
 
         if self.y < 100 + self.rad/2:
             for i in range(len(posX)):
-                if scores[i] >= 0:
-                    if abs(posX[i] - self.x) < 75:
-                        print("bounced")
-                        scores[i] += 100
-                    else:
-                        print("lose")
-                        scores[i] = -scores[i] - 1
-            print("turning")
+                if abs(posX[i] - self.x) < 75:
+                    pass
+                else:
+                    nns[i] = Neural_Network.breed(random.choice(nns),random.choice(nns),2)
+            #print("turning")
             self.yvel *= -1
             self.y = 100 + self.rad/2
-        return scores
-
+        return
     def get(self):
-        return self.x,self.y
+        return [self.x,self.y]
 
 
 def main():
